@@ -11,9 +11,8 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoricalData, getStockHistory } from "@/services/stock-service";
-import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StockChartProps {
   symbol: string;
@@ -80,19 +79,19 @@ export function StockChart({ symbol, name, isPositive = true }: StockChartProps)
         </div>
       </CardHeader>
       <CardContent>
-        <div className="chart-container">
+        <div className="h-[400px] w-full">
           {loading ? (
             <div className="h-full w-full flex items-center justify-center">
-              <div className="animate-pulse text-muted-foreground">Loading chart data...</div>
+              <Skeleton className="h-full w-full rounded-md" />
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={data}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
               >
                 <defs>
-                  <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id={`colorClose-${symbol}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={gradientColor} stopOpacity={0.8} />
                     <stop offset="95%" stopColor={gradientColor} stopOpacity={0} />
                   </linearGradient>
@@ -102,28 +101,47 @@ export function StockChart({ symbol, name, isPositive = true }: StockChartProps)
                   dataKey="date" 
                   tickFormatter={(value) => {
                     const date = new Date(value);
-                    if (period === "1d") return date.toLocaleTimeString().slice(0, 5);
-                    if (period === "1w" || period === "1m") return date.toLocaleDateString().slice(0, 5);
-                    return new Date(value).toLocaleDateString();
+                    if (period === "1d") return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    if (period === "1w") return date.toLocaleDateString([], {weekday: 'short'});
+                    if (period === "1m") return date.toLocaleDateString([], {day: 'numeric'});
+                    return date.toLocaleDateString([], {month: 'short', day: 'numeric'});
                   }}
                   style={{ fontSize: '0.75rem' }}
                   tickMargin={10}
+                  minTickGap={15}
                 />
                 <YAxis 
-                  domain={['dataMin - 1%', 'dataMax + 1%']} 
+                  domain={['auto', 'auto']}
                   style={{ fontSize: '0.75rem' }}
                   tickFormatter={(value) => `₹${value.toLocaleString()}`}
+                  tickCount={5}
+                  width={80}
                 />
                 <Tooltip 
                   formatter={(value: number) => [`₹${value.toLocaleString()}`, "Price"]}
-                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                  labelFormatter={(label) => {
+                    const date = new Date(label);
+                    if (period === "1d") {
+                      return date.toLocaleDateString() + ', ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    return date.toLocaleDateString();
+                  }}
+                  contentStyle={{
+                    backgroundColor: 'var(--background)',
+                    borderColor: 'var(--border)',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  }}
+                  wrapperStyle={{ zIndex: 100 }}
                 />
                 <Area
                   type="monotone"
                   dataKey="close"
                   stroke={gradientColor}
+                  strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#colorClose)"
+                  fill={`url(#colorClose-${symbol})`}
+                  activeDot={{ r: 6, strokeWidth: 0, fill: gradientColor }}
                 />
               </AreaChart>
             </ResponsiveContainer>
