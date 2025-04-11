@@ -1,28 +1,49 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { StockData } from "@/services/stock-service";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { StockData, PortfolioItem, getUserPortfolio, removeFromPortfolio } from "@/services/stock-service";
+import { TrendingDown, TrendingUp, Plus, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 interface StockCardProps {
   stock: StockData;
   onClick?: (stock: StockData) => void;
   showAddButton?: boolean;
   onAddToPortfolio?: (stock: StockData) => void;
+  onRemoveFromPortfolio?: (symbol: string) => void;
 }
 
 export function StockCard({ 
   stock, 
   onClick, 
   showAddButton = false,
-  onAddToPortfolio
+  onAddToPortfolio,
+  onRemoveFromPortfolio
 }: StockCardProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
+  const [isInPortfolio, setIsInPortfolio] = useState(false);
+
+  useEffect(() => {
+    // Check if the stock is already in the portfolio
+    const checkPortfolio = async () => {
+      if (!user) return;
+      
+      try {
+        const portfolio = await getUserPortfolio(user.id);
+        setIsInPortfolio(portfolio.some((item: PortfolioItem) => item.symbol === stock.symbol));
+      } catch (error) {
+        console.error("Error checking portfolio:", error);
+      }
+    };
+
+    checkPortfolio();
+  }, [stock.symbol, user]);
 
   const handleClick = () => {
     if (onClick) onClick(stock);
@@ -32,9 +53,22 @@ export function StockCard({
     e.stopPropagation();
     if (onAddToPortfolio) {
       onAddToPortfolio(stock);
+      setIsInPortfolio(true);
       toast({
         title: "Added to Portfolio",
         description: `${stock.name} has been added to your portfolio`,
+      });
+    }
+  };
+
+  const handleRemoveFromPortfolio = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onRemoveFromPortfolio) {
+      onRemoveFromPortfolio(stock.symbol);
+      setIsInPortfolio(false);
+      toast({
+        title: "Removed from Portfolio",
+        description: `${stock.name} has been removed from your portfolio`,
       });
     }
   };
@@ -77,14 +111,27 @@ export function StockCard({
             </div>
           </div>
           {showAddButton && (
-            <Button 
-              size="sm" 
-              onClick={handleAddToPortfolio}
-              variant="outline"
-              className="ml-2"
-            >
-              Add
-            </Button>
+            isInPortfolio ? (
+              <Button 
+                size="sm" 
+                onClick={handleRemoveFromPortfolio}
+                variant="outline"
+                className="ml-2 text-destructive border-destructive hover:bg-destructive/10"
+              >
+                <Trash className="h-4 w-4 mr-1" />
+                Remove
+              </Button>
+            ) : (
+              <Button 
+                size="sm" 
+                onClick={handleAddToPortfolio}
+                variant="outline"
+                className="ml-2"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            )
           )}
         </div>
       </CardContent>

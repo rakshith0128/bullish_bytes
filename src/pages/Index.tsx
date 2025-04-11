@@ -1,14 +1,19 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StockData, getStockList } from "@/services/stock-service";
+import { 
+  StockData, 
+  getStockList, 
+  addToPortfolio,
+  removeFromPortfolio
+} from "@/services/stock-service";
 import { Navbar } from "@/components/navbar";
 import { StockCard } from "@/components/stock-card";
 import { StockChart } from "@/components/stock-chart";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 const Index = () => {
   const [stocks, setStocks] = useState<StockData[]>([]);
@@ -18,6 +23,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -26,7 +32,6 @@ const Index = () => {
         setStocks(stockList);
         setFilteredStocks(stockList);
         
-        // Set the first stock as selected by default
         if (stockList.length > 0) {
           setSelectedStock(stockList[0]);
         }
@@ -66,8 +71,70 @@ const Index = () => {
     navigate(`/stock/${encodeURIComponent(stock.symbol)}`);
   };
 
-  const handleAddToPortfolio = (stock: StockData) => {
-    navigate(`/portfolio/add?symbol=${encodeURIComponent(stock.symbol)}`);
+  const handleAddToPortfolio = async (stock: StockData) => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to add stocks to your portfolio",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const success = await addToPortfolio({
+        symbol: stock.symbol,
+        quantity: 1,
+        buyPrice: stock.price,
+        addedAt: new Date().toISOString(),
+      });
+
+      if (success) {
+        toast({
+          title: "Success",
+          description: `${stock.name} has been added to your portfolio.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add to portfolio. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error adding to portfolio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add to portfolio. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveFromPortfolio = async (symbol: string) => {
+    try {
+      const success = await removeFromPortfolio(symbol);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Stock removed from portfolio",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove stock from portfolio",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error removing from portfolio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove stock from portfolio",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -76,7 +143,6 @@ const Index = () => {
       
       <main className="container py-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {/* Left column - Selected stock chart */}
           <div className="md:col-span-2">
             <Card className="h-full">
               <CardHeader>
@@ -123,7 +189,6 @@ const Index = () => {
             </Card>
           </div>
           
-          {/* Right column - Stock list */}
           <div>
             <Card className="h-full">
               <CardHeader className="pb-2">
@@ -157,6 +222,7 @@ const Index = () => {
                           onClick={handleStockCardClick}
                           showAddButton
                           onAddToPortfolio={handleAddToPortfolio}
+                          onRemoveFromPortfolio={handleRemoveFromPortfolio}
                         />
                       </div>
                     ))}

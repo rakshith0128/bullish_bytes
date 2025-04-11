@@ -1,15 +1,10 @@
-
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -17,12 +12,19 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { StockData, getStockList, searchStocks } from "@/services/stock-service";
+import { 
+  StockData, 
+  getStockList, 
+  searchStocks, 
+  addToPortfolio, 
+  removeFromPortfolio 
+} from "@/services/stock-service";
 import { StockCard } from "@/components/stock-card";
 import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/auth-context";
 
 const Markets = () => {
   const [stocks, setStocks] = useState<StockData[]>([]);
@@ -32,6 +34,7 @@ const Markets = () => {
   const [activeTab, setActiveTab] = useState("all");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -119,8 +122,70 @@ const Markets = () => {
     navigate(`/stock/${encodeURIComponent(stock.symbol)}`);
   };
 
-  const handleAddToPortfolio = (stock: StockData) => {
-    navigate(`/portfolio/add?symbol=${encodeURIComponent(stock.symbol)}`);
+  const handleAddToPortfolio = async (stock: StockData) => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to add stocks to your portfolio",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const success = await addToPortfolio({
+        symbol: stock.symbol,
+        quantity: 1, // Default quantity
+        buyPrice: stock.price,
+        addedAt: new Date().toISOString(),
+      });
+
+      if (success) {
+        toast({
+          title: "Success",
+          description: `${stock.name} has been added to your portfolio.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add to portfolio. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error adding to portfolio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add to portfolio. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveFromPortfolio = async (symbol: string) => {
+    try {
+      const success = await removeFromPortfolio(symbol);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Stock removed from portfolio",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove stock from portfolio",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error removing from portfolio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove stock from portfolio",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -187,6 +252,7 @@ const Markets = () => {
                     onClick={handleStockCardClick}
                     showAddButton
                     onAddToPortfolio={handleAddToPortfolio}
+                    onRemoveFromPortfolio={handleRemoveFromPortfolio}
                   />
                 ))}
               </div>
